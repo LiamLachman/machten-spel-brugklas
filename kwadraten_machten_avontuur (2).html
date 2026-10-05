@@ -1,0 +1,213 @@
+<!-- ... existing code ... -->
+        // Game Objects
+        const player = {
+            x: 50,
+            y: 500,
+            width: 30,
+            height: 30,
+            color: '#ff3366', // Pinkish red for contrast
+            velocityX: 0,
+            velocityY: 0,
+            speed: 5,
+            jumpStrength: 15, // Verhoogde sprongkracht
+            grounded: false,
+            score: 0,
+            isDead: false
+        };
+
+        const gravity = 0.6;
+        let cameraX = 0;
+
+        // Level Design - Uitgebreid en gevarieerd
+        const platforms = [
+            { x: 0, y: 550, width: 800, height: 50, type: 'ground' }, // Start area
+            { x: 850, y: 500, width: 200, height: 20, type: 'platform' },
+            { x: 1150, y: 450, width: 150, height: 20, type: 'platform' },
+            { x: 1400, y: 550, width: 500, height: 50, type: 'ground' }, // Safe zone 1
+            { x: 2000, y: 500, width: 100, height: 20, type: 'platform', moving: true, range: 150, startY: 500 }, // Moving up/down
+            { x: 2200, y: 400, width: 150, height: 20, type: 'platform' },
+            { x: 2500, y: 350, width: 100, height: 20, type: 'platform', movingX: true, range: 200, startX: 2500 }, // Moving left/right
+            { x: 2900, y: 550, width: 600, height: 50, type: 'ground' }, // Safe zone 2
+            { x: 3600, y: 480, width: 80, height: 20, type: 'platform' },
+            { x: 3750, y: 400, width: 80, height: 20, type: 'platform' },
+            { x: 3900, y: 320, width: 80, height: 20, type: 'platform' },
+            { x: 4100, y: 250, width: 300, height: 20, type: 'platform' }, // High path
+            { x: 4500, y: 550, width: 1000, height: 50, type: 'ground' }, // Final stretch
+            { x: 5000, y: 450, width: 150, height: 20, type: 'platform' }, // Obstacle before goal
+            { x: 5200, y: 350, width: 150, height: 20, type: 'platform' }  // Obstacle before goal
+        ];
+
+        const coins = [
+            { x: 300, y: 500, collected: false },
+            { x: 600, y: 500, collected: false },
+            { x: 900, y: 450, collected: false },
+            { x: 950, y: 450, collected: false },
+            { x: 1200, y: 400, collected: false },
+            { x: 1500, y: 500, collected: false },
+            { x: 1600, y: 500, collected: false },
+            { x: 2030, y: 450, collected: false }, // Boven bewegend platform
+            { x: 2250, y: 350, collected: false },
+            { x: 2530, y: 300, collected: false }, // Boven bewegend platform
+            { x: 3000, y: 500, collected: false },
+            { x: 3200, y: 500, collected: false },
+            { x: 3630, y: 430, collected: false },
+            { x: 3780, y: 350, collected: false },
+            { x: 3930, y: 270, collected: false },
+            { x: 4200, y: 200, collected: false },
+            { x: 4250, y: 200, collected: false },
+            { x: 4300, y: 200, collected: false },
+            { x: 4700, y: 500, collected: false },
+            { x: 5050, y: 400, collected: false },
+            { x: 5250, y: 300, collected: false }
+        ];
+
+        const goal = {
+            x: 5400,
+            y: 400,
+            width: 50,
+            height: 150
+        };
+
+        const deathZoneY = 800; // Als speler hieronder valt, game over
+
+        // Input handling
+<!-- ... existing code ... -->
+        // Update game state
+        function update() {
+            if (currentState !== 'game' || player.isDead) return;
+
+            // ... (rest of update logic) ...
+            player.x += player.velocityX;
+
+            // Friction (air resistance / ground friction)
+            player.velocityX *= 0.85;
+
+            // Apply gravity
+            player.velocityY += gravity;
+            player.y += player.velocityY;
+
+            // Collision detection with platforms
+            player.grounded = false;
+            let currentPlatformSpeedX = 0;
+
+            platforms.forEach(platform => {
+                // Moving platform logic
+                if (platform.moving) {
+                    if (!platform.dir) platform.dir = 1;
+                    if (!platform.offset) platform.offset = 0;
+                    
+                    platform.offset += 1.5 * platform.dir;
+                    platform.y = platform.startY + platform.offset;
+                    
+                    if (Math.abs(platform.offset) > platform.range) {
+                        platform.dir *= -1;
+                    }
+                }
+                if (platform.movingX) {
+                    if (!platform.dirX) platform.dirX = 1;
+                    if (!platform.offsetX) platform.offsetX = 0;
+                    
+                    platform.offsetX += 2 * platform.dirX;
+                    platform.x = platform.startX + platform.offsetX;
+                    
+                    if (Math.abs(platform.offsetX) > platform.range) {
+                        platform.dirX *= -1;
+                    }
+                }
+
+                // AABB Collision
+                if (player.x < platform.x + platform.width &&
+                    player.x + player.width > platform.x &&
+                    player.y < platform.y + platform.height &&
+                    player.y + player.height > platform.y) {
+                    
+                    // Top collision (landing) - Only if falling down onto it
+                    if (player.velocityY > 0 && player.y + player.height - player.velocityY <= platform.y) {
+                        player.y = platform.y - player.height;
+                        player.velocityY = 0;
+                        player.grounded = true;
+                        
+                        // Meebewegen met horizontaal platform
+                        if (platform.movingX) {
+                            currentPlatformSpeedX = 2 * platform.dirX;
+                        }
+                    }
+                    // Bottom collision (hitting head)
+                    else if (player.velocityY < 0 && player.y - player.velocityY >= platform.y + platform.height) {
+                        player.y = platform.y + platform.height;
+                        player.velocityY = 0;
+                    }
+                    // Side collisions
+                    else {
+                        // Very basic side collision
+                        if (player.velocityX > 0) {
+                            player.x = platform.x - player.width;
+                            player.velocityX = 0;
+                        } else if (player.velocityX < 0) {
+                            player.x = platform.x + platform.width;
+                            player.velocityX = 0;
+                        }
+                    }
+                }
+            });
+
+            // Apply platform movement to player if grounded on it
+            if (player.grounded) {
+                player.x += currentPlatformSpeedX;
+            }
+
+            // Coin collection
+<!-- ... existing code ... -->
+        // Draw game
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (currentState === 'menu') {
+                drawMenu();
+                return;
+            }
+
+            if (currentState === 'victory') {
+                drawVictory();
+                return;
+            }
+
+            // Draw Background (Parallax effect)
+            ctx.fillStyle = '#0f172a'; // Dark slate background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid pattern for visual flair
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            for(let i = 0; i < canvas.width; i+=100) {
+                ctx.beginPath();
+                ctx.moveTo(i - (cameraX * 0.1) % 100, 0);
+                ctx.lineTo(i - (cameraX * 0.1) % 100, canvas.height);
+                ctx.stroke();
+            }
+
+            ctx.save();
+            ctx.translate(-cameraX, 0);
+
+            // Draw Platforms
+            platforms.forEach(platform => {
+                if (platform.type === 'ground') {
+                    ctx.fillStyle = '#334155'; // Darker ground
+                    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    // Top highlight
+                    ctx.fillStyle = '#475569';
+                    ctx.fillRect(platform.x, platform.y, platform.width, 10);
+                } else {
+                    ctx.fillStyle = '#10b981'; // Green platforms
+                    ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+                    
+                    // Als het een bewegend platform is, geef het een ander accent
+                    if(platform.moving || platform.movingX) {
+                        ctx.fillStyle = '#34d399'; // Lichter groen voor bewegende platforms
+                        ctx.fillRect(platform.x + 5, platform.y + 5, platform.width - 10, platform.height - 10);
+                    }
+                }
+            });
+
+            // Draw Coins
+<!-- ... existing code ... -->
